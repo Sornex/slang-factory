@@ -1,0 +1,16 @@
+{
+    "configurations": [
+        {
+            "name": "Windows-MSVC",
+            "compilerPath": "cl.exe",
+            "intelliSenseMode": "windows-msvc-x64",
+            "cppStandard": "c++17",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/src",
+                "D:/soft/slang/include"
+            ]
+        }
+    ],
+    "version": 4
+}
