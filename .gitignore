@@ -1,0 +1,39 @@
+# Build folders
+build/
+cmake-build-*/
+out/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+compile_commands.json
+
+# Visual Studio
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+
+# VS Code local files
+*.code-workspace
+
+# Binaries
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+
+# Logs / temp
+*.log
+*.tmp
+
+# Generated shader outputs
+generated/*.spv
+generated/*.dxil
+generated/*.metal
+generated/*.glsl
