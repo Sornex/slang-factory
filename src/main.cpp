@@ -1,9 +1,7 @@
 #include <iostream>
 #include <string>
 
-#include <slang.h>
-#include <slang-com-ptr.h>
-
+#include "helpers/slang_compiler.h"
 #include "helpers/slang_reflection_dumper.h"
 
 // For now I'm taking just a constant string with slang code, in future I will generate it myself, hopefully))
@@ -37,105 +35,30 @@ static void print_diagnostics(slang::IBlob* diagnostics)
 
 int main()
 {
-    using Slang::ComPtr;
-
-    // I was following a Using the Compilation API tutorial here https://docs.shader-slang.org/en/latest/compilation-api.html
-    // 1) Create Global Session
-    ComPtr<slang::IGlobalSession> global_session;
-    if (SLANG_FAILED(slang::createGlobalSession(global_session.writeRef())))
+    SlangCompiler compiler;
+    if (!compiler.init_spirv_1_5())
     {
-        std::cerr << "Failed to create global session.\n";
+        std::cerr << "Failed to initialize SlangCompiler.\n";
         return -1;
     }
 
-    // 2) Create Session
-    slang::SessionDesc session_desc = {};
+    auto result = compiler.compile_from_source_string(
+        "generated_module",
+        "generated_module.slang",
+        kSlangSource,
+        "computeMain");
 
-    // List of enabled compilation targets, so in this step I selected spir 5, it was given also in example, but I guess I will really use spir 5, because it's what Vulkan uses
-    slang::TargetDesc target_desc = {};
-    target_desc.format = SLANG_SPIRV;
-    target_desc.profile = global_session->findProfile("spirv_1_5");
+    if (result.diagnostics)
+        print_diagnostics(result.diagnostics.get());
 
-    session_desc.targets = &target_desc;
-    session_desc.targetCount = 1;
-
-    // Create the session
-    ComPtr<slang::ISession> session;
-    if (SLANG_FAILED(global_session->createSession(session_desc, session.writeRef())))
+    if (!result.layout)
     {
-        std::cerr << "Failed to create Slang session.\n";
-        return -1;
-    }
-
-    // 3) Load Modules
-    ComPtr<slang::IBlob> diagnostics;
-    ComPtr<slang::IModule> module;
-
-    // Here I've obviously used my string as a source
-    module = session->loadModuleFromSourceString(
-        "generated_module",          // moduleName
-        "generated_module.slang",     // modulePath
-        kSlangSource,                // source
-        diagnostics.writeRef()        // diagnostics
-    );
-
-    if (!module)
-    {
-        print_diagnostics(diagnostics.get());
-        std::cerr << "Failed to load module from source string.\n";
-        return -1;
-    }
-
-    // 4) Query Entry Points
-    ComPtr<slang::IEntryPoint> entry_point;
-    diagnostics.setNull();
-    
-    if (SLANG_FAILED(module->findEntryPointByName("computeMain", entry_point.writeRef())))
-    {
-        print_diagnostics(diagnostics.get());
-        std::cerr << "Failed to find entry point 'computeMain'.\n";
-        return -1;
-    }
-
-    // 5) Compose Modules and Entry Points, I've changed this part slightly bcs I was getting errors with an example in tutorial
-    slang::IComponentType* components[] = { module.get(), entry_point.get() };
-    ComPtr<slang::IComponentType> program;
-    diagnostics.setNull();
-
-    if (SLANG_FAILED(session->createCompositeComponentType(
-            components,
-            2,
-            program.writeRef(),
-            diagnostics.writeRef())))
-    {
-        print_diagnostics(diagnostics.get());
-        std::cerr << "Failed to create composite component type.\n";
-        return -1;
-    }
-
-
-    // 6) Link
-    Slang::ComPtr<slang::IComponentType> linked_program;
-    diagnostics.setNull();
-
-    if (SLANG_FAILED(program->link(linked_program.writeRef(), diagnostics.writeRef())))
-    {
-        print_diagnostics(diagnostics.get());
-        std::cerr << "Failed to link program.\n";
-        return -1;
-    }
-
-    // 7) Reflection
-
-    slang::ProgramLayout* layout = linked_program->getLayout();
-    if (!layout)
-    {
-        std::cerr << "No ProgramLayout returned (reflection unavailable).\n";
+        std::cerr << "Compilation succeeded but no ProgramLayout was returned.\n";
         return -1;
     }
 
     SlangReflectionDumper dumper(std::cout);
-    dumper.dump(layout);
+    dumper.dump(result.layout);
 
     return 0;
 }

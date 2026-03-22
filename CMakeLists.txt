@@ -16,6 +16,7 @@ add_executable(slang_factory
     src/main.cpp
     src/slang_factory.cpp
     src/slang_reflection_dumper.cpp
+    src/slang_compiler.cpp
 )
 
 target_include_directories(slang_factory PRIVATE
