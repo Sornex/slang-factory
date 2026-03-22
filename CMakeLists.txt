@@ -15,6 +15,7 @@ set(SLANG_DLL_PATH "${SLANG_DIR}/bin/slang.dll")
 add_executable(slang_factory
     src/main.cpp
     src/slang_factory.cpp
+    src/slang_reflection_dumper.cpp
 )
 
 target_include_directories(slang_factory PRIVATE
