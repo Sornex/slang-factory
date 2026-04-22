@@ -14,6 +14,7 @@ public:
     {
         Slang::ComPtr<slang::IComponentType> linked_program;
         slang::ProgramLayout* layout = nullptr;
+        Slang::ComPtr<slang::IBlob> target_code;
 
         Slang::ComPtr<slang::IBlob> diagnostics;
     };
@@ -28,6 +29,8 @@ public:
         const char* virtual_path,
         const char* source,
         const char* entry_point_name);
+
+    bool write_target_code_to_file(const char* path, slang::IBlob* code);
 
 private:
     // Basicaly just helpers
