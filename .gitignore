@@ -33,7 +33,5 @@ compile_commands.json
 *.tmp
 
 # Generated shader outputs
-generated/*.spv
-generated/*.dxil
-generated/*.metal
-generated/*.glsl
+generated/shaders/*.spv
+generated/slang/*.slang
