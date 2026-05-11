@@ -18,6 +18,10 @@ EDEN currently consists of three working groups:
 Goal is to create a Slang factory in C++. It should accept parameters, then create a big string that contains
 valid Slang code. I will use the compilation API to compile this code, then use the reflection API to get all reflection information out.
 
+### Current Status
+
+Have a working demo that generates fragment and vertex shaders. Also splitted functionality to make a library. Making a facade class for now, so enginge will need to work only with 1 class.
+
 ## Tech Stack (FOR NOW)
 - C++
 - CMake
