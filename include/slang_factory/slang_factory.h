@@ -6,10 +6,11 @@
 class SlangFactory
 {
 public:
-    // Returns full Slang code (as a single module) containing one entry point.
-    std::string generate(const ShaderRequest& req) const;
+    // Generates one Slang module that can contain VS, FS, or both.
+    std::string generate_pipeline_module(const ShaderRequest& req) const;
 
 private:
-    std::string generate_vertex_shader(const ShaderRequest& req) const;
-    std::string generate_fragment_shader(const ShaderRequest& req) const;
+    void emit_common_types(const ShaderRequest& req, std::string& out) const;
+    void emit_vertex_entry(const ShaderRequest& req, std::string& out) const;
+    void emit_fragment_entry(const ShaderRequest& req, std::string& out) const;
 };

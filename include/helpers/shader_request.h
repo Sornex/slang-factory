@@ -2,10 +2,11 @@
 #include <string>
 #include <vector>
 
-enum class ShaderStage
+enum class ShaderPipelineMode
 {
-    Vertex,
-    Fragment
+    VertexOnly,
+    FragmentOnly,
+    VertexFragment
 };
 
 struct VertexAttribute
@@ -17,19 +18,20 @@ struct VertexAttribute
 
 struct ShaderRequest
 {
-    ShaderStage stage = ShaderStage::Vertex;
+    ShaderPipelineMode mode = ShaderPipelineMode::VertexFragment;
 
-    // Common
-    std::string entry_point = "main";
+    // Entry point names
+    std::string vs_entry = "vertexMain";
+    std::string fs_entry = "fragmentMain";
 
-    // Vertex shader settings
+    // Vertex inputs
     std::vector<VertexAttribute> vertex_inputs;
-    bool pass_uv_to_fragment = false;
-    bool pass_color_to_fragment = false;
 
-    // Fragment shader settings
-    bool use_constant_color = true;
+    // Varyings to pass VS -> FS
+    bool use_uv = false;
     bool use_vertex_color = false;
+
+    // Fragment shading options
+    bool use_constant_color = true;
     bool use_texture = false;
-    
 };
