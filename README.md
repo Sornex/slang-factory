@@ -20,7 +20,8 @@ valid Slang code. I will use the compilation API to compile this code, then use 
 
 ### Current Status
 
-Have a working demo that generates fragment and vertex shaders. Also splitted functionality to make a library. Making a facade class for now, so enginge will need to work only with 1 class.
+Have a working demo that generates fragment and vertex shaders. Also splitted functionality to make a library. Made a facade class.
+TODO: Reflection Extrator that will generate offset info and store them for an engine
 
 ## Tech Stack (FOR NOW)
 - C++
