@@ -19,6 +19,7 @@ add_library(slang_factory_lib
     src/slang_compiler.cpp
     src/slang_reflection_dumper.cpp
     src/slang_factory.cpp
+    src/slang_shader_builder.cpp
 )
 
 target_include_directories(slang_factory_lib PUBLIC

@@ -3,10 +3,9 @@
 #include <fstream>
 #include <filesystem>
 
-#include "helpers/slang_compiler.h"
 #include "helpers/slang_reflection_dumper.h"
-#include "slang_factory/slang_factory.h"
 #include "helpers/shader_request.h"
+#include "slang_factory/slang_shader_builder.h"
 
 static void print_diagnostics(slang::IBlob* diagnostics)
 {
@@ -33,51 +32,18 @@ static bool write_text_file(const char* path, const std::string& text)
     return (bool)file;
 }
 
-static void compile_and_dump(
-    SlangCompiler& compiler,
-    const std::string& source,
-    const char* entry_point,
-    const char* output_spv_path)
+static bool write_blob_to_file(const char* path, slang::IBlob* blob)
 {
-    auto result = compiler.compile_from_source_string(
-        "generated_module",
-        "generated_module.slang",
-        source.c_str(),
-        entry_point);
+    if (!path || !blob) return false;
 
-    if (result.diagnostics)
-    {
-        print_diagnostics(result.diagnostics.get());
-    }
+    std::ofstream file(path, std::ios::binary);
+    if (!file) return false;
 
-    if (result.target_code)
-    {
-        std::cout << "[" << entry_point << "] SPIR-V bytes: "
-                  << result.target_code->getBufferSize() << "\n";
+    file.write(
+        static_cast<const char*>(blob->getBufferPointer()),
+        static_cast<std::streamsize>(blob->getBufferSize()));
 
-        if (compiler.write_target_code_to_file(output_spv_path, result.target_code.get()))
-        {
-            std::cout << "[" << entry_point << "] wrote: " << output_spv_path << "\n";
-        }
-        else
-        {
-            std::cerr << "[" << entry_point << "] failed to write: " << output_spv_path << "\n";
-        }
-    }
-    else
-    {
-        std::cerr << "[" << entry_point << "] no target code produced.\n";
-    }
-
-    if (!result.layout)
-    {
-        std::cerr << "[" << entry_point << "] no ProgramLayout returned.\n";
-        return;
-    }
-
-    std::cout << "\n=== Reflection Dump (" << entry_point << ") ===\n";
-    SlangReflectionDumper dumper(std::cout);
-    dumper.dump(result.layout);
+    return static_cast<bool>(file);
 }
 
 int main()
@@ -135,14 +101,21 @@ int main()
         }
     }
 
-    SlangFactory factory;
-    std::string source = factory.generate_pipeline_module(req);
-
     std::filesystem::create_directories("generated/slang");
     std::filesystem::create_directories("generated/shaders");
 
+    SlangShaderBuilder builder;
+
+    if (!builder.init_spirv_1_5())
+    {
+        std::cerr << "Failed to initialize SlangShaderBuilder.\n";
+        return -1;
+    }
+
+    auto build_result = builder.build_pipeline(req);
+
     const char* slang_path = "generated/slang/generated_module.slang";
-    if (write_text_file(slang_path, source))
+    if (write_text_file(slang_path, build_result.generated_source))
     {
         std::cout << "Wrote Slang source to: " << slang_path << "\n";
     }
@@ -152,26 +125,70 @@ int main()
     }
 
     std::cout << "\n=== Generated Slang Module ===\n";
-    std::cout << source << "\n";
+    std::cout << build_result.generated_source << "\n";
 
-    SlangCompiler compiler;
-    if (!compiler.init_spirv_1_5())
+    if (build_result.vertex.diagnostics)
     {
-        std::cerr << "Failed to initialize SlangCompiler.\n";
+        std::cout << "\n=== Vertex Diagnostics ===\n";
+        print_diagnostics(build_result.vertex.diagnostics.get());
+    }
+
+    if (build_result.fragment.diagnostics)
+    {
+        std::cout << "\n=== Fragment Diagnostics ===\n";
+        print_diagnostics(build_result.fragment.diagnostics.get());
+    }
+
+    if (build_result.vertex.target_code)
+    {
+        const char* vertex_path = "generated/shaders/vertex.spv";
+        if (write_blob_to_file(vertex_path, build_result.vertex.target_code.get()))
+        {
+            std::cout << "Wrote vertex SPIR-V to: " << vertex_path << "\n";
+            std::cout << "Vertex SPIR-V bytes: "
+                      << build_result.vertex.target_code->getBufferSize() << "\n";
+        }
+    }
+
+    if (build_result.fragment.target_code)
+    {
+        const char* fragment_path = "generated/shaders/fragment.spv";
+        if (write_blob_to_file(fragment_path, build_result.fragment.target_code.get()))
+        {
+            std::cout << "Wrote fragment SPIR-V to: " << fragment_path << "\n";
+            std::cout << "Fragment SPIR-V bytes: "
+                      << build_result.fragment.target_code->getBufferSize() << "\n";
+        }
+    }
+
+    if (build_result.vertex.layout)
+    {
+        std::cout << "\n=== Reflection Dump (Vertex) ===\n";
+        SlangReflectionDumper dumper(std::cout);
+        dumper.dump(build_result.vertex.layout);
+    }
+    else
+    {
+        std::cerr << "No vertex ProgramLayout returned.\n";
+    }
+
+    if (build_result.fragment.layout)
+    {
+        std::cout << "\n=== Reflection Dump (Fragment) ===\n";
+        SlangReflectionDumper dumper(std::cout);
+        dumper.dump(build_result.fragment.layout);
+    }
+    else
+    {
+        std::cerr << "No fragment ProgramLayout returned.\n";
+    }
+
+    if (!build_result.success)
+    {
+        std::cerr << "\nBuild pipeline failed.\n";
         return -1;
     }
 
-    compile_and_dump(
-        compiler,
-        source,
-        req.vs_entry.c_str(),
-        "generated/shaders/vertex.spv");
-
-    compile_and_dump(
-        compiler,
-        source,
-        req.fs_entry.c_str(),
-        "generated/shaders/fragment.spv");
-
+    std::cout << "\nBuild pipeline succeeded.\n";
     return 0;
 }
