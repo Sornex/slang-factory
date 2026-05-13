@@ -7,13 +7,6 @@
 #include "helpers/shader_request.h"
 #include "slang_factory/slang_shader_builder.h"
 
-static void print_diagnostics(slang::IBlob* diagnostics)
-{
-    if (!diagnostics) return;
-    const char* text = (const char*)diagnostics->getBufferPointer();
-    if (text && text[0]) std::cerr << text << "\n";
-}
-
 static int read_int_choice()
 {
     int v = 0;
@@ -21,29 +14,68 @@ static int read_int_choice()
     return v;
 }
 
-static bool write_text_file(const char* path, const std::string& text)
+static void print_extracted_field(const ReflectedField& field, int depth = 0)
 {
-    if (!path) return false;
+    for (int i = 0; i < depth; ++i) std::cout << "  ";
 
-    std::ofstream file(path);
-    if (!file) return false;
+    std::cout << "- name: " << field.name
+              << ", type: " << field.type_name
+              << ", kind: " << field.kind << "\n";
 
-    file << text;
-    return (bool)file;
+    if (!field.offsets.empty())
+    {
+        for (int i = 0; i < depth + 1; ++i) std::cout << "  ";
+        std::cout << "offsets:\n";
+
+        for (const auto& off : field.offsets)
+        {
+            for (int i = 0; i < depth + 2; ++i) std::cout << "  ";
+            std::cout << off.category
+                      << " offset=" << off.offset
+                      << " space=" << off.space << "\n";
+        }
+    }
+
+    if (!field.children.empty())
+    {
+        for (int i = 0; i < depth + 1; ++i) std::cout << "  ";
+        std::cout << "children:\n";
+
+        for (const auto& child : field.children)
+        {
+            print_extracted_field(child, depth + 2);
+        }
+    }
 }
 
-static bool write_blob_to_file(const char* path, slang::IBlob* blob)
+static void print_extracted_program(const ReflectedProgram& program, const char* label)
 {
-    if (!path || !blob) return false;
+    std::cout << "\n=== Extracted Reflection (" << label << ") ===\n";
 
-    std::ofstream file(path, std::ios::binary);
-    if (!file) return false;
+    std::cout << "Global fields:\n";
+    for (const auto& field : program.global_fields)
+    {
+        print_extracted_field(field, 1);
+    }
 
-    file.write(
-        static_cast<const char*>(blob->getBufferPointer()),
-        static_cast<std::streamsize>(blob->getBufferSize()));
+    std::cout << "Entry points:\n";
+    for (const auto& ep : program.entry_points)
+    {
+        std::cout << "  entry: " << ep.entry_name
+                  << ", stage: " << ep.stage << "\n";
 
-    return static_cast<bool>(file);
+        std::cout << "    parameters:\n";
+        for (const auto& p : ep.parameters)
+        {
+            print_extracted_field(p, 3);
+        }
+
+        std::cout << "    result:\n";
+        for (const auto& r : ep.result_fields)
+        {
+            print_extracted_field(r, 3);
+        }
+    }
 }
 
 int main()
@@ -115,7 +147,7 @@ int main()
     auto build_result = builder.build_pipeline(req);
 
     const char* slang_path = "generated/slang/generated_module.slang";
-    if (write_text_file(slang_path, build_result.generated_source))
+    if (SlangShaderBuilder::write_text_file(slang_path, build_result.generated_source))
     {
         std::cout << "Wrote Slang source to: " << slang_path << "\n";
     }
@@ -127,22 +159,22 @@ int main()
     std::cout << "\n=== Generated Slang Module ===\n";
     std::cout << build_result.generated_source << "\n";
 
-    if (build_result.vertex.diagnostics)
+    if (!build_result.vertex.diagnostics_text.empty())
     {
         std::cout << "\n=== Vertex Diagnostics ===\n";
-        print_diagnostics(build_result.vertex.diagnostics.get());
+        std::cout << build_result.vertex.diagnostics_text << "\n";
     }
 
-    if (build_result.fragment.diagnostics)
+    if (!build_result.fragment.diagnostics_text.empty())
     {
         std::cout << "\n=== Fragment Diagnostics ===\n";
-        print_diagnostics(build_result.fragment.diagnostics.get());
+        std::cout << build_result.fragment.diagnostics_text << "\n";
     }
 
     if (build_result.vertex.target_code)
     {
         const char* vertex_path = "generated/shaders/vertex.spv";
-        if (write_blob_to_file(vertex_path, build_result.vertex.target_code.get()))
+        if (SlangShaderBuilder::write_blob_to_file(vertex_path, build_result.vertex.target_code.get()))
         {
             std::cout << "Wrote vertex SPIR-V to: " << vertex_path << "\n";
             std::cout << "Vertex SPIR-V bytes: "
@@ -153,7 +185,7 @@ int main()
     if (build_result.fragment.target_code)
     {
         const char* fragment_path = "generated/shaders/fragment.spv";
-        if (write_blob_to_file(fragment_path, build_result.fragment.target_code.get()))
+        if (SlangShaderBuilder::write_blob_to_file(fragment_path, build_result.fragment.target_code.get()))
         {
             std::cout << "Wrote fragment SPIR-V to: " << fragment_path << "\n";
             std::cout << "Fragment SPIR-V bytes: "
@@ -183,7 +215,94 @@ int main()
         std::cerr << "No fragment ProgramLayout returned.\n";
     }
 
-    if (!build_result.success)
+    print_extracted_program(build_result.vertex.reflection_data, "Vertex");
+    print_extracted_program(build_result.fragment.reflection_data, "Fragment");
+
+    const auto* camera = SlangReflectionExtractor::find_field_by_name(
+    build_result.vertex.reflection_data.global_fields,
+    "CameraParams");
+
+    if (camera)
+    {
+        std::cout << "\n[TEST] Found CameraParams\n";
+    }
+
+    const auto* mvp = SlangReflectionExtractor::find_field_by_path(
+        build_result.vertex.reflection_data.global_fields,
+        {"CameraParams", "mvp"});
+
+    if (mvp)
+    {
+        std::cout << "[TEST] Found CameraParams.mvp, type=" << mvp->type_name
+                << ", kind=" << mvp->kind << "\n";
+    }
+
+    std::vector<const ReflectedField*> uniform_fields;
+    SlangReflectionExtractor::flatten_uniform_fields(
+        build_result.vertex.reflection_data.global_fields,
+        uniform_fields);
+
+    std::cout << "[TEST] Flattened uniform fields count: " << uniform_fields.size() << "\n";
+    for (const auto* f : uniform_fields)
+    {
+        std::cout << "  - " << f->name << " (" << f->kind << ")\n";
+    }
+
+    auto vertex_uniforms = SlangReflectionExtractor::get_uniform_leaf_fields(build_result.vertex.reflection_data);
+
+    std::cout << "\n[TEST] Vertex uniform leaf fields:\n";
+    for (const auto* f : vertex_uniforms)
+    {
+        std::cout << "  - " << f->name << " (" << f->kind << ")\n";
+    }
+
+    auto fragment_resources = SlangReflectionExtractor::get_resource_fields(build_result.fragment.reflection_data);
+
+    std::cout << "[TEST] Fragment resources:\n";
+    for (const auto* f : fragment_resources)
+    {
+        std::cout << "  - " << f->name << " (" << f->kind << ")\n";
+    }
+
+    if (!build_result.vertex.reflection_data.entry_points.empty())
+    {
+        const auto& vertex_stage = build_result.vertex.reflection_data.entry_points[0];
+        auto stage_inputs = SlangReflectionExtractor::get_stage_parameter_fields(vertex_stage);
+        auto stage_outputs = SlangReflectionExtractor::get_stage_result_fields(vertex_stage);
+
+        std::cout << "[TEST] Vertex stage inputs:\n";
+        for (const auto* f : stage_inputs)
+        {
+            std::cout << "  - " << f->name << " (" << f->kind << ")\n";
+        }
+
+        std::cout << "[TEST] Vertex stage outputs:\n";
+        for (const auto* f : stage_outputs)
+        {
+            std::cout << "  - " << f->name << " (" << f->kind << ")\n";
+        }
+    }
+
+    if (!build_result.fragment.reflection_data.entry_points.empty())
+    {
+        const auto& fragment_stage = build_result.fragment.reflection_data.entry_points[0];
+        auto stage_inputs = SlangReflectionExtractor::get_stage_parameter_fields(fragment_stage);
+        auto stage_outputs = SlangReflectionExtractor::get_stage_result_fields(fragment_stage);
+
+        std::cout << "[TEST] Fragment stage inputs:\n";
+        for (const auto* f : stage_inputs)
+        {
+            std::cout << "  - " << f->name << " (" << f->kind << ")\n";
+        }
+
+        std::cout << "[TEST] Fragment stage outputs:\n";
+        for (const auto* f : stage_outputs)
+        {
+            std::cout << "  - " << f->name << " (" << f->kind << ")\n";
+        }
+    }
+
+    if (!build_result.has_valid_pipeline())
     {
         std::cerr << "\nBuild pipeline failed.\n";
         return -1;

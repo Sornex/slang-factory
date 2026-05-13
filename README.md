@@ -20,8 +20,8 @@ valid Slang code. I will use the compilation API to compile this code, then use 
 
 ### Current Status
 
-Have a working demo that generates fragment and vertex shaders. Also splitted functionality to make a library. Made a facade class.
-TODO: Reflection Extrator that will generate offset info and store them for an engine
+Have a working demo that generates fragment and vertex shaders. Also splitted the project to make a library and a showcase demo seperatly. Made a facade class.
+TODO: Making a vulkan renderer to test my factory and make a better showcase
 
 ## Tech Stack (FOR NOW)
 - C++
