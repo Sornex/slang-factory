@@ -20,11 +20,12 @@ valid Slang code. I will use the compilation API to compile this code, then use 
 
 ### Current Status
 
-Have a working demo that generates fragment and vertex shaders. Also splitted the project to make a library and a showcase demo seperatly. Made a facade class.
-TODO: Making a vulkan renderer to test my factory and make a better showcase
+Generation of vertex and fragment shaders, will add some more shader resources like mvp, base_color and maybe texture. Everything is done with slang and I’m using slang api. MAde a small vulkan renderer for demo and I have made a console app that shows some inner infos for debugging.
+Future plans, add other types of shaders and try to work with some real engines
 
 ## Tech Stack (FOR NOW)
 - C++
 - CMake
 - Slang
 - VS Code
+- Vulkan

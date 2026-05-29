@@ -34,4 +34,6 @@ struct ShaderRequest
     // Fragment shading options
     bool use_constant_color = true;
     bool use_texture = false;
+
+    bool use_mvp_transform = true;
 };

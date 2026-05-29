@@ -63,11 +63,14 @@ void SlangFactory::emit_common_types(const ShaderRequest& req, std::string& out)
     append_line(out);
 
     // Vertex shader uniform data
-    append_line(out, "cbuffer CameraParams");
-    append_line(out, "{");
-    append_line(out, "    float4x4 mvp;");
-    append_line(out, "};");
-    append_line(out);
+    if (req.use_mvp_transform)
+    {
+        append_line(out, "cbuffer CameraParams");
+        append_line(out, "{");
+        append_line(out, "    float4x4 mvp;");
+        append_line(out, "};");
+        append_line(out);
+    }
 
     // Fragment shader uniform data
     if (req.use_constant_color)
@@ -94,7 +97,15 @@ void SlangFactory::emit_vertex_entry(const ShaderRequest& req, std::string& out)
     append_line(out, "VSOutput " + req.vs_entry + "(VSInput input)");
     append_line(out, "{");
     append_line(out, "    VSOutput o;");
-    append_line(out, "    o.position = mul(mvp, float4(input.position, 1.0));");
+    
+    if (req.use_mvp_transform)
+    {
+        append_line(out, "    o.position = mul(mvp, float4(input.position, 1.0));");
+    }
+    else
+    {
+        append_line(out, "    o.position = float4(input.position, 1.0);");
+    }
 
     if (req.use_uv)
         append_line(out, "    o.uv = input.uv;");
