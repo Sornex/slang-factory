@@ -16,6 +16,11 @@ struct Vertex
     float color[4];
 };
 
+struct CameraUniformData
+{
+    float mvp[16];
+};
+
 static const std::array<Vertex, 3> kTriangleVertices =
 {
     Vertex{ {  0.0f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
@@ -88,6 +93,9 @@ bool VulkanRenderer::init_vulkan(const RendererShaderBinaries& shaders)
     if (!create_render_pass())
         return false;
 
+    if (!create_descriptor_set_layout())
+        return false;
+
     if (!create_graphics_pipeline(shaders))
         return false;
 
@@ -95,6 +103,15 @@ bool VulkanRenderer::init_vulkan(const RendererShaderBinaries& shaders)
         return false;
 
     if (!create_command_pool())
+        return false;
+
+    if (!create_uniform_buffer())
+        return false;
+
+    if (!create_descriptor_pool())
+        return false;
+
+    if (!create_descriptor_set())
         return false;
 
     if (!create_vertex_buffer())
@@ -665,8 +682,8 @@ bool VulkanRenderer::create_graphics_pipeline(const RendererShaderBinaries& shad
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout_info.setLayoutCount = 0;
-    pipeline_layout_info.pSetLayouts = nullptr;
+    pipeline_layout_info.setLayoutCount = 1;
+    pipeline_layout_info.pSetLayouts = &descriptor_set_layout_;
     pipeline_layout_info.pushConstantRangeCount = 0;
     pipeline_layout_info.pPushConstantRanges = nullptr;
 
@@ -865,6 +882,7 @@ void VulkanRenderer::record_command_buffer(VkCommandBuffer command_buffer, uint3
 
     vkCmdBeginRenderPass(command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline_);
+    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1, &descriptor_set_, 0, nullptr);
 
     VkBuffer vertex_buffers[] = { vertex_buffer_ };
     VkDeviceSize offsets[] = { 0 };
@@ -913,6 +931,7 @@ void VulkanRenderer::draw_frame()
         &image_index);
 
     vkResetCommandBuffer(command_buffers_[image_index], 0);
+    update_uniform_buffer();
     record_command_buffer(command_buffers_[image_index], image_index);
 
     VkSubmitInfo submit_info{};
@@ -959,6 +978,142 @@ void VulkanRenderer::run()
     {
         vkDeviceWaitIdle(device_);
     }
+}
+
+bool VulkanRenderer::create_descriptor_set_layout()
+{
+    VkDescriptorSetLayoutBinding ubo_layout_binding{};
+    ubo_layout_binding.binding = 0;
+    ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    ubo_layout_binding.descriptorCount = 1;
+    ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    ubo_layout_binding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo layout_info{};
+    layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layout_info.bindingCount = 1;
+    layout_info.pBindings = &ubo_layout_binding;
+
+    if (vkCreateDescriptorSetLayout(device_, &layout_info, nullptr, &descriptor_set_layout_) != VK_SUCCESS)
+    {
+        std::cerr << "Failed to create descriptor set layout.\n";
+        return false;
+    }
+
+    std::cout << "Descriptor set layout created successfully.\n";
+    return true;
+}
+
+bool VulkanRenderer::create_uniform_buffer()
+{
+    VkDeviceSize buffer_size = sizeof(CameraUniformData);
+
+    VkBufferCreateInfo buffer_info{};
+    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_info.size = buffer_size;
+    buffer_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device_, &buffer_info, nullptr, &uniform_buffer_) != VK_SUCCESS)
+    {
+        std::cerr << "Failed to create uniform buffer.\n";
+        return false;
+    }
+
+    VkMemoryRequirements mem_requirements{};
+    vkGetBufferMemoryRequirements(device_, uniform_buffer_, &mem_requirements);
+
+    VkMemoryAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.allocationSize = mem_requirements.size;
+    alloc_info.memoryTypeIndex = find_memory_type(
+        mem_requirements.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(device_, &alloc_info, nullptr, &uniform_buffer_memory_) != VK_SUCCESS)
+    {
+        std::cerr << "Failed to allocate uniform buffer memory.\n";
+        return false;
+    }
+
+    vkBindBufferMemory(device_, uniform_buffer_, uniform_buffer_memory_, 0);
+
+    std::cout << "Uniform buffer created successfully.\n";
+    return true;
+}
+
+bool VulkanRenderer::create_descriptor_pool()
+{
+    VkDescriptorPoolSize pool_size{};
+    pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_size.descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo pool_info{};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.poolSizeCount = 1;
+    pool_info.pPoolSizes = &pool_size;
+    pool_info.maxSets = 1;
+
+    if (vkCreateDescriptorPool(device_, &pool_info, nullptr, &descriptor_pool_) != VK_SUCCESS)
+    {
+        std::cerr << "Failed to create descriptor pool.\n";
+        return false;
+    }
+
+    std::cout << "Descriptor pool created successfully.\n";
+    return true;
+}
+
+bool VulkanRenderer::create_descriptor_set()
+{
+    VkDescriptorSetAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    alloc_info.descriptorPool = descriptor_pool_;
+    alloc_info.descriptorSetCount = 1;
+    alloc_info.pSetLayouts = &descriptor_set_layout_;
+
+    if (vkAllocateDescriptorSets(device_, &alloc_info, &descriptor_set_) != VK_SUCCESS)
+    {
+        std::cerr << "Failed to allocate descriptor set.\n";
+        return false;
+    }
+
+    VkDescriptorBufferInfo buffer_info{};
+    buffer_info.buffer = uniform_buffer_;
+    buffer_info.offset = 0;
+    buffer_info.range = sizeof(CameraUniformData);
+
+    VkWriteDescriptorSet descriptor_write{};
+    descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptor_write.dstSet = descriptor_set_;
+    descriptor_write.dstBinding = 0;
+    descriptor_write.dstArrayElement = 0;
+    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptor_write.descriptorCount = 1;
+    descriptor_write.pBufferInfo = &buffer_info;
+
+    vkUpdateDescriptorSets(device_, 1, &descriptor_write, 0, nullptr);
+
+    std::cout << "Descriptor set created successfully.\n";
+    return true;
+}
+
+void VulkanRenderer::update_uniform_buffer()
+{
+    CameraUniformData ubo =
+    {
+        {
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f
+        }
+    };
+
+    void* data = nullptr;
+    vkMapMemory(device_, uniform_buffer_memory_, 0, sizeof(ubo), 0, &data);
+    std::memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(device_, uniform_buffer_memory_);
 }
 
 void VulkanRenderer::shutdown()
@@ -1044,6 +1199,30 @@ void VulkanRenderer::shutdown()
     {
         vkDestroySwapchainKHR(device_, swapchain_, nullptr);
         swapchain_ = VK_NULL_HANDLE;
+    }
+
+    if (descriptor_pool_ != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorPool(device_, descriptor_pool_, nullptr);
+        descriptor_pool_ = VK_NULL_HANDLE;
+    }
+
+    if (descriptor_set_layout_ != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorSetLayout(device_, descriptor_set_layout_, nullptr);
+        descriptor_set_layout_ = VK_NULL_HANDLE;
+    }
+
+    if (uniform_buffer_ != VK_NULL_HANDLE)
+    {
+        vkDestroyBuffer(device_, uniform_buffer_, nullptr);
+        uniform_buffer_ = VK_NULL_HANDLE;
+    }
+
+    if (uniform_buffer_memory_ != VK_NULL_HANDLE)
+    {
+        vkFreeMemory(device_, uniform_buffer_memory_, nullptr);
+        uniform_buffer_memory_ = VK_NULL_HANDLE;
     }
 
     if (device_ != VK_NULL_HANDLE)

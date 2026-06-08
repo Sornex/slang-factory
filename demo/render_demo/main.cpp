@@ -21,7 +21,7 @@ int main()
     req.use_vertex_color = true;
     req.use_texture = false;
     req.use_constant_color = false;
-    req.use_mvp_transform = false;
+    req.use_mvp_transform = true;
 
     SlangShaderBuilder builder;
     if (!builder.init_spirv_1_5())

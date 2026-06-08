@@ -69,6 +69,12 @@ private:
     bool create_command_buffers();
     bool create_sync_objects();
 
+    bool create_descriptor_set_layout();
+    bool create_uniform_buffer();
+    bool create_descriptor_pool();
+    bool create_descriptor_set();
+    void update_uniform_buffer();
+
     void record_command_buffer(VkCommandBuffer command_buffer, uint32_t image_index);
     void draw_frame();
 
@@ -116,4 +122,11 @@ private:
     VkSemaphore image_available_semaphore_ = VK_NULL_HANDLE;
     VkSemaphore render_finished_semaphore_ = VK_NULL_HANDLE;
     VkFence in_flight_fence_ = VK_NULL_HANDLE;
+
+    VkDescriptorSetLayout descriptor_set_layout_ = VK_NULL_HANDLE;
+    VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
+    VkDescriptorSet descriptor_set_ = VK_NULL_HANDLE;
+
+    VkBuffer uniform_buffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory uniform_buffer_memory_ = VK_NULL_HANDLE;
 };
