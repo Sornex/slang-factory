@@ -4,17 +4,7 @@
 #include <ostream>
 #include <iostream>
 
-/*
-So here is my dumper. For the hieararchy i've decided to dump it like this
-
-=== ProgramLayout ===
-- Global Scope
-    - fields (name, type, etc)
-- Entry Points
-    - entry point (name, stage, scope)
-        -scope
-
-*/
+//Dumps Slang reflection data in a readable hierarchical text format.
 
 class SlangReflectionDumper
 {
@@ -41,7 +31,7 @@ private:
     // TypeReflection (no layout)
     void dump_type(slang::TypeReflection* type, int depth);
 
-    // Helpers
+    // Formatting and conversion helpers
     void indent(int n);
     const char* stage_to_string(SlangStage stage);
     const char* type_kind_to_string(slang::TypeReflection::Kind k);
@@ -49,7 +39,7 @@ private:
     const char* param_category_to_string(slang::ParameterCategory c);
     const char* resource_access_to_string(SlangResourceAccess a);
 
-    // Maybe will need to fix this
+    // Extracts a readable resource shape name from a reflected type name.
     std::string extract_resource_shape_name(const char* type_name);
     void print_resource_shape(slang::TypeReflection* type);
 };

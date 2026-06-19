@@ -8,14 +8,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FetchContent)
 
-# ---- Slang path ----
+# ---- Slang ----
+# Adjust this path to your local Slang SDK location.
 set(SLANG_DIR "D:/soft/slang")
 set(SLANG_INCLUDE_DIR "${SLANG_DIR}/include")
-
 set(SLANG_LIB_PATH "${SLANG_DIR}/lib/slang.lib")
 set(SLANG_DLL_PATH "${SLANG_DIR}/bin/slang.dll")
 
-# ---- GLFW ----
+# ---- Dependencies ----
 FetchContent_Declare(
     glfw
     GIT_REPOSITORY https://github.com/glfw/glfw.git
@@ -24,19 +24,26 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glfw)
 
-# ---- Vulkan ----
 find_package(Vulkan REQUIRED)
 
+function(copy_slang_dll target_name)
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SLANG_DLL_PATH}"
+            $<TARGET_FILE_DIR:${target_name}>
+    )
+endfunction()
 
-# --- Library ----
-
-add_library(slang_factory_lib
+# ---- Library ----
+set(SLANG_FACTORY_SOURCES
     src/slang_compiler.cpp
     src/slang_reflection_dumper.cpp
     src/slang_factory.cpp
     src/slang_shader_builder.cpp
     src/slang_reflection_extractor.cpp
 )
+
+add_library(slang_factory_lib ${SLANG_FACTORY_SOURCES})
 
 target_include_directories(slang_factory_lib PUBLIC
     ${SLANG_INCLUDE_DIR}
@@ -47,7 +54,6 @@ target_link_libraries(slang_factory_lib PUBLIC
     "${SLANG_LIB_PATH}"
 )
 
-
 # ---- Wizard Demo ----
 add_executable(slang_factory_demo
     demo/slang_factory_demo.cpp
@@ -57,11 +63,7 @@ target_link_libraries(slang_factory_demo PRIVATE
     slang_factory_lib
 )
 
-add_custom_command(TARGET slang_factory_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${SLANG_DLL_PATH}"
-        $<TARGET_FILE_DIR:slang_factory_demo>
-)
+copy_slang_dll(slang_factory_demo)
 
 # ---- Render Demo ----
 add_executable(slang_factory_render_demo
@@ -79,8 +81,4 @@ target_link_libraries(slang_factory_render_demo PRIVATE
     Vulkan::Vulkan
 )
 
-add_custom_command(TARGET slang_factory_render_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${SLANG_DLL_PATH}"
-        $<TARGET_FILE_DIR:slang_factory_render_demo>
-)
+copy_slang_dll(slang_factory_render_demo)

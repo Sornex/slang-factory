@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+// Defines which shader stages should be generated.
 enum class ShaderPipelineMode
 {
     VertexOnly,
@@ -16,6 +17,7 @@ struct VertexAttribute
     std::string semantic;  // POSITION, TEXCOORD0, COLOR0
 };
 
+// Describes what kind of shader pipeline the factory should generate.
 struct ShaderRequest
 {
     ShaderPipelineMode mode = ShaderPipelineMode::VertexFragment;

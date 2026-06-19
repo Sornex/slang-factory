@@ -5,6 +5,7 @@
 
 #include <slang.h>
 
+// One reflected offset entry for a specific parameter category.
 struct ReflectedOffset
 {
     std::string category;
@@ -12,6 +13,8 @@ struct ReflectedOffset
     size_t space = 0;
 };
 
+
+// A reflected field with optional child fields for nested structures.
 struct ReflectedField
 {
     std::string name;
@@ -22,6 +25,7 @@ struct ReflectedField
     std::vector<ReflectedField> children;
 };
 
+// Reflection data for one shader entry point.
 struct ReflectedStage
 {
     std::string entry_name;
@@ -31,6 +35,7 @@ struct ReflectedStage
     std::vector<ReflectedField> result_fields;
 };
 
+// Top-level extracted reflection for a compiled shader program.
 struct ReflectedProgram
 {
     std::vector<ReflectedField> global_fields;
@@ -43,17 +48,18 @@ public:
     ReflectedProgram extract(slang::ProgramLayout* layout);
 
     // Helpers for engine-style access
-    static const ReflectedField* find_field_by_name(const std::vector<ReflectedField>& fields, const std::string& name);
 
+    // Query helpers
+    static const ReflectedField* find_field_by_name(const std::vector<ReflectedField>& fields, const std::string& name);
     static const ReflectedField* find_field_by_path(const std::vector<ReflectedField>& fields, const std::vector<std::string>& path);
 
+    // Collection helpers
     static void collect_fields_by_kind(const std::vector<ReflectedField>& fields, const std::string& kind, std::vector<const ReflectedField*>& out_fields);
-
     static void flatten_uniform_fields(const std::vector<ReflectedField>& fields, std::vector<const ReflectedField*>& out_fields);
 
+    // Convenience helpers
     static std::vector<const ReflectedField*> get_resource_fields(const ReflectedProgram& program);
     static std::vector<const ReflectedField*> get_uniform_leaf_fields(const ReflectedProgram& program);
-
     static std::vector<const ReflectedField*> get_stage_parameter_fields(const ReflectedStage& stage);
     static std::vector<const ReflectedField*> get_stage_result_fields(const ReflectedStage& stage);
 

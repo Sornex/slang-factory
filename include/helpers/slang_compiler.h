@@ -10,6 +10,7 @@
 class SlangCompiler
 {
 public:
+    // Stores the main outputs produced by one Slang compilation request.
     struct Result
     {
         Slang::ComPtr<slang::IComponentType> linked_program;
@@ -30,10 +31,11 @@ public:
         const char* source,
         const char* entry_point_name);
 
+    // Writes compiled target code (for example SPIR-V) to a binary file.
     bool write_target_code_to_file(const char* path, slang::IBlob* code);
 
 private:
-    // Basicaly just helpers
+    // Slang sessions used for compilation.
     Slang::ComPtr<slang::IGlobalSession> global_session_;
     Slang::ComPtr<slang::ISession> session_;
 

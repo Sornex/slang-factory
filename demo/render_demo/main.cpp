@@ -4,24 +4,44 @@
 #include "slang_factory/slang_shader_builder.h"
 #include "vulkan_renderer.h"
 
+namespace
+{
+    constexpr int k_window_width = 1280;
+    constexpr int k_window_height = 720;
+    constexpr const char* k_window_title = "Slang Factory Render Demo";
+
+    ShaderRequest make_render_demo_request()
+    {
+        ShaderRequest req;
+        req.mode = ShaderPipelineMode::VertexFragment;
+        req.vs_entry = "vertexMain";
+        req.fs_entry = "fragmentMain";
+
+        req.vertex_inputs.push_back({ "position", "float3", "POSITION" });
+        req.vertex_inputs.push_back({ "color", "float4", "COLOR0" });
+
+        req.use_uv = false;
+        req.use_vertex_color = true;
+        req.use_texture = false;
+        req.use_constant_color = true;
+        req.use_mvp_transform = true;
+
+        return req;
+    }
+
+    void print_stage_diagnostics(const char* label, const SlangShaderBuilder::StageResult& stage)
+    {
+        if (stage.diagnostics_text.empty())
+            return;
+
+        std::cerr << "\n=== " << label << " Diagnostics ===\n";
+        std::cerr << stage.diagnostics_text << "\n";
+    }
+}
+
 int main()
 {
-    // Build a very simple pipeline for the renderer:
-    // - vertex input: position + color
-    // - fragment: vertex color only
-    ShaderRequest req;
-    req.mode = ShaderPipelineMode::VertexFragment;
-    req.vs_entry = "vertexMain";
-    req.fs_entry = "fragmentMain";
-
-    req.vertex_inputs.push_back({ "position", "float3", "POSITION" });
-    req.vertex_inputs.push_back({ "color", "float4", "COLOR0" });
-
-    req.use_uv = false;
-    req.use_vertex_color = true;
-    req.use_texture = false;
-    req.use_constant_color = false;
-    req.use_mvp_transform = true;
+    const ShaderRequest request = make_render_demo_request();
 
     SlangShaderBuilder builder;
     if (!builder.init_spirv_1_5())
@@ -30,23 +50,12 @@ int main()
         return -1;
     }
 
-    auto build_result = builder.build_pipeline(req);
+    const auto build_result = builder.build_pipeline(request);
     if (!build_result.has_valid_pipeline())
     {
         std::cerr << "Failed to build shader pipeline.\n";
-
-        if (!build_result.vertex.diagnostics_text.empty())
-        {
-            std::cerr << "\n=== Vertex Diagnostics ===\n";
-            std::cerr << build_result.vertex.diagnostics_text << "\n";
-        }
-
-        if (!build_result.fragment.diagnostics_text.empty())
-        {
-            std::cerr << "\n=== Fragment Diagnostics ===\n";
-            std::cerr << build_result.fragment.diagnostics_text << "\n";
-        }
-
+        print_stage_diagnostics("Vertex", build_result.vertex);
+        print_stage_diagnostics("Fragment", build_result.fragment);
         return -1;
     }
 
@@ -59,7 +68,7 @@ int main()
     shaders.fragment_shader = build_result.fragment.target_code.get();
 
     VulkanRenderer renderer;
-    if (!renderer.init("Slang Factory Render Demo", 1280, 720, shaders))
+    if (!renderer.init(k_window_title, k_window_width, k_window_height, shaders))
     {
         std::cerr << "Failed to initialize VulkanRenderer.\n";
         return -1;

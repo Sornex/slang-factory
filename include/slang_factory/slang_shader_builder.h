@@ -10,9 +10,11 @@
 #include "slang_factory/slang_factory.h"
 #include "helpers/slang_reflection_extractor.h"
 
+// High-level helper that generates shader source, compiles it, and extracts reflection data.
 class SlangShaderBuilder
 {
 public:
+    // Stores compilation and reflection outputs for one shader stage.
     struct StageResult
     {
         bool success = false;
@@ -26,10 +28,18 @@ public:
         
         ReflectedProgram reflection_data;
 
-        bool has_code() const { return target_code != nullptr; }
-        bool has_layout() const { return layout != nullptr; }
+        bool has_code() const
+        {
+            return target_code != nullptr;
+        }
+
+        bool has_layout() const
+        {
+            return layout != nullptr;
+        }
     };
 
+    // Stores the full result of building a shader pipeline module.
     struct BuildResult
     {
         bool success = false;
@@ -53,8 +63,10 @@ public:
 
     BuildResult build_pipeline(const ShaderRequest& request);
 
+    // Utility helpers for saving generated source and compiled binaries.
     static bool write_text_file(const char* path, const std::string& text);
     static bool write_blob_to_file(const char* path, slang::IBlob* blob);
+
 private:
     SlangCompiler compiler;
     SlangFactory factory;

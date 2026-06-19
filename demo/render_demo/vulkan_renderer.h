@@ -10,6 +10,7 @@
 
 struct RendererShaderBinaries
 {
+    // Compiled stage binaries produced by SlangShaderBuilder.
     slang::IBlob* vertex_shader = nullptr;
     slang::IBlob* fragment_shader = nullptr;
 };
@@ -53,7 +54,6 @@ private:
 
     bool create_instance();
     bool create_surface();
-
     bool pick_physical_device();
     bool create_logical_device();
 
@@ -61,6 +61,7 @@ private:
     bool create_image_views();
 
     bool create_render_pass();
+    bool create_descriptor_set_layout();
     bool create_graphics_pipeline(const RendererShaderBinaries& shaders);
     bool create_framebuffers();
 
@@ -68,65 +69,75 @@ private:
     bool create_vertex_buffer();
     bool create_command_buffers();
     bool create_sync_objects();
-
-    bool create_descriptor_set_layout();
-    bool create_uniform_buffer();
+    bool create_uniform_buffers();
     bool create_descriptor_pool();
     bool create_descriptor_set();
-    void update_uniform_buffer();
 
+    void update_uniform_buffer();
     void record_command_buffer(VkCommandBuffer command_buffer, uint32_t image_index);
     void draw_frame();
 
     bool is_device_suitable(VkPhysicalDevice device);
     QueueFamilyIndices find_queue_families(VkPhysicalDevice device);
-
     SwapchainSupportDetails query_swapchain_support(VkPhysicalDevice device);
+
     VkSurfaceFormatKHR choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>& available_formats);
     VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& available_present_modes);
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities);
 
     VkShaderModule create_shader_module(slang::IBlob* shader_blob);
-
     uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties);
 
 private:
+    // Window
     GLFWwindow* window_ = nullptr;
 
+    // Core Vulkan objects
     VkInstance instance_ = VK_NULL_HANDLE;
     VkSurfaceKHR surface_ = VK_NULL_HANDLE;
-
     VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
     VkDevice device_ = VK_NULL_HANDLE;
 
+    // Queues
     VkQueue graphics_queue_ = VK_NULL_HANDLE;
     VkQueue present_queue_ = VK_NULL_HANDLE;
 
+    // Swapchain
     VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
     std::vector<VkImage> swapchain_images_;
     std::vector<VkImageView> swapchain_image_views_;
     VkFormat swapchain_image_format_ = VK_FORMAT_UNDEFINED;
     VkExtent2D swapchain_extent_{};
 
+    // Pipeline and framebuffers
     VkRenderPass render_pass_ = VK_NULL_HANDLE;
     VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
     VkPipeline graphics_pipeline_ = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> swapchain_framebuffers_;
 
+    // Command submission
     VkCommandPool command_pool_ = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> command_buffers_;
 
+    // Geometry buffers
     VkBuffer vertex_buffer_ = VK_NULL_HANDLE;
     VkDeviceMemory vertex_buffer_memory_ = VK_NULL_HANDLE;
 
+    // Uniform buffers
+    VkBuffer camera_uniform_buffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory camera_uniform_buffer_memory_ = VK_NULL_HANDLE;
+    VkBuffer material_uniform_buffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory material_uniform_buffer_memory_ = VK_NULL_HANDLE;
+
+    // Synchronization
     VkSemaphore image_available_semaphore_ = VK_NULL_HANDLE;
     VkSemaphore render_finished_semaphore_ = VK_NULL_HANDLE;
     VkFence in_flight_fence_ = VK_NULL_HANDLE;
 
+    // Descriptor resources
     VkDescriptorSetLayout descriptor_set_layout_ = VK_NULL_HANDLE;
     VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
     VkDescriptorSet descriptor_set_ = VK_NULL_HANDLE;
 
-    VkBuffer uniform_buffer_ = VK_NULL_HANDLE;
-    VkDeviceMemory uniform_buffer_memory_ = VK_NULL_HANDLE;
+
 };
