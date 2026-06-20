@@ -148,6 +148,8 @@ build/Debug/slang_factory_render_demo
 
 This demo uses generated shaders to create a Vulkan graphics pipeline and render a triangle.
 
+![alt text](docs/images/image.png)
+
 ## Future Work
 
 Possible future extensions include:

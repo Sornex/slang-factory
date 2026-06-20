@@ -1238,7 +1238,7 @@ void VulkanRenderer::update_uniform_buffer()
     // Update material color multiplier.
     MaterialUniformData material_ubo =
     {
-        { 1.0f, 0.0f, 0.0f, 1.0f }
+        { 1.0f, 1.0f, 1.0f, 1.0f }
     };
 
     vkMapMemory(device_, material_uniform_buffer_memory_, 0, sizeof(material_ubo), 0, &data);
