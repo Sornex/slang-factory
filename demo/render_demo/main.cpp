@@ -37,12 +37,33 @@ namespace
         std::cerr << "\n=== " << label << " Diagnostics ===\n";
         std::cerr << stage.diagnostics_text << "\n";
     }
+    
+    static DemoScene read_demo_scene()
+    {
+        std::cout << "Choose render demo scene:\n";
+        std::cout << "1) Triangle\n";
+        std::cout << "2) Quad\n";
+        std::cout << "3) Animated Triangle\n";
+        std::cout << "Choice: ";
+
+        int choice = 1;
+        std::cin >> choice;
+
+        switch (choice)
+        {
+        case 2: return DemoScene::Quad;
+        case 3: return DemoScene::AnimatedTriangle;
+        default: return DemoScene::Triangle;
+        }
+    }
 }
+
 
 int main()
 {
+    const DemoScene scene = read_demo_scene();
     const ShaderRequest request = make_render_demo_request();
-
+    
     SlangShaderBuilder builder;
     if (!builder.init_spirv_1_5())
     {
@@ -68,7 +89,7 @@ int main()
     shaders.fragment_shader = build_result.fragment.target_code.get();
 
     VulkanRenderer renderer;
-    if (!renderer.init(k_window_title, k_window_width, k_window_height, shaders))
+    if (!renderer.init(k_window_title, k_window_width, k_window_height, shaders, scene))
     {
         std::cerr << "Failed to initialize VulkanRenderer.\n";
         return -1;

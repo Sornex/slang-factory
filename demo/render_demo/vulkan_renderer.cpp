@@ -9,6 +9,8 @@
 #include <vector>
 #include <cstring>
 #include <stdexcept>
+#include <chrono>
+#include <cmath>
 
 // --- Structs --- 
 
@@ -35,6 +37,17 @@ static const std::array<Vertex, 3> kTriangleVertices =
     Vertex{ { -0.5f,  0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
 };
 
+static const std::array<Vertex, 6> kQuadVertices =
+{
+    Vertex{ { -0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+    Vertex{ {  0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+    Vertex{ {  0.5f,  0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+
+    Vertex{ { -0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+    Vertex{ {  0.5f,  0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+    Vertex{ { -0.5f,  0.5f, 0.0f }, { 1.0f, 1.0f, 0.0f, 1.0f } }
+};
+
 // --- Lifecycle --- 
 
 VulkanRenderer::~VulkanRenderer()
@@ -46,8 +59,11 @@ bool VulkanRenderer::init(
     const char* window_title,
     int width,
     int height,
-    const RendererShaderBinaries& shaders)
+    const RendererShaderBinaries& shaders,
+    DemoScene scene)
 {
+    scene_ = scene;
+
     if (!init_window(window_title, width, height))
         return false;
 
@@ -1029,7 +1045,27 @@ bool VulkanRenderer::create_command_pool()
 // For this demo we use a simple host-visible vertex buffer for one triangle.
 bool VulkanRenderer::create_vertex_buffer()
 {
-    VkDeviceSize buffer_size = sizeof(kTriangleVertices);
+    const Vertex* vertex_data = nullptr;
+    size_t vertex_count = 0;
+
+    switch (scene_)
+    {
+    case DemoScene::Quad:
+        vertex_data = kQuadVertices.data();
+        vertex_count = kQuadVertices.size();
+        break;
+
+    case DemoScene::AnimatedTriangle:
+    case DemoScene::Triangle:
+    default:
+        vertex_data = kTriangleVertices.data();
+        vertex_count = kTriangleVertices.size();
+        break;
+    }
+
+    vertex_count_ = static_cast<uint32_t>(vertex_count);
+
+    VkDeviceSize buffer_size = sizeof(Vertex) * vertex_count;
 
     VkBufferCreateInfo buffer_info{};
     buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1063,10 +1099,11 @@ bool VulkanRenderer::create_vertex_buffer()
 
     void* data = nullptr;
     vkMapMemory(device_, vertex_buffer_memory_, 0, buffer_size, 0, &data);
-    std::memcpy(data, kTriangleVertices.data(), static_cast<size_t>(buffer_size));
+    std::memcpy(data, vertex_data, static_cast<size_t>(buffer_size));
     vkUnmapMemory(device_, vertex_buffer_memory_);
 
     std::cout << "Vertex buffer created successfully.\n";
+    std::cout << "Vertex count: " << vertex_count_ << "\n";
     return true;
 }
 
@@ -1219,14 +1256,31 @@ bool VulkanRenderer::create_descriptor_set()
 
 void VulkanRenderer::update_uniform_buffer()
 {
-    // Update camera transform.
-    CameraUniformData camera_ubo =
+    CameraUniformData camera_ubo{};
+
+    float angle = 0.0f;
+
+    if (scene_ == DemoScene::AnimatedTriangle)
+    {
+        static const auto start_time = std::chrono::high_resolution_clock::now();
+        const auto current_time = std::chrono::high_resolution_clock::now();
+
+        const float time =
+            std::chrono::duration<float>(current_time - start_time).count();
+
+        angle = time;
+    }
+
+    const float c = std::cos(angle);
+    const float s = std::sin(angle);
+
+    camera_ubo =
     {
         {
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 1.0f
+             c,    s, 0.0f, 0.0f,
+            -s,    c, 0.0f, 0.0f,
+           0.0f, 0.0f, 1.0f, 0.0f,
+           0.0f, 0.0f, 0.0f, 1.0f
         }
     };
 
@@ -1235,11 +1289,23 @@ void VulkanRenderer::update_uniform_buffer()
     std::memcpy(data, &camera_ubo, sizeof(camera_ubo));
     vkUnmapMemory(device_, camera_uniform_buffer_memory_);
 
-    // Update material color multiplier.
-    MaterialUniformData material_ubo =
+    MaterialUniformData material_ubo{};
+
+    switch (scene_)
     {
-        { 1.0f, 1.0f, 1.0f, 1.0f }
-    };
+    case DemoScene::Quad:
+        material_ubo = { { 0.7f, 1.0f, 0.7f, 1.0f } };
+        break;
+
+    case DemoScene::AnimatedTriangle:
+        material_ubo = { { 1.0f, 0.8f, 0.8f, 1.0f } };
+        break;
+
+    case DemoScene::Triangle:
+    default:
+        material_ubo = { { 1.0f, 1.0f, 1.0f, 1.0f } };
+        break;
+    }
 
     vkMapMemory(device_, material_uniform_buffer_memory_, 0, sizeof(material_ubo), 0, &data);
     std::memcpy(data, &material_ubo, sizeof(material_ubo));
@@ -1288,22 +1354,24 @@ void VulkanRenderer::record_command_buffer(VkCommandBuffer command_buffer, uint3
     render_pass_info.pClearValues = &clear_color;
 
     vkCmdBeginRenderPass(command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline_);
+
     vkCmdBindDescriptorSets(
-        command_buffer, 
-        VK_PIPELINE_BIND_POINT_GRAPHICS, 
-        pipeline_layout_, 
-        0, 
-        1, 
-        &descriptor_set_, 
-        0, 
+        command_buffer,
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipeline_layout_,
+        0,
+        1,
+        &descriptor_set_,
+        0,
         nullptr);
 
     VkBuffer vertex_buffers[] = { vertex_buffer_ };
     VkDeviceSize offsets[] = { 0 };
     vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
 
-    vkCmdDraw(command_buffer, static_cast<uint32_t>(kTriangleVertices.size()), 1, 0, 0);
+    vkCmdDraw(command_buffer, vertex_count_, 1, 0, 0);
 
     vkCmdEndRenderPass(command_buffer);
 

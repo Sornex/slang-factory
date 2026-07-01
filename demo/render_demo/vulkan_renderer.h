@@ -33,6 +33,13 @@ struct SwapchainSupportDetails
     std::vector<VkPresentModeKHR> present_modes;
 };
 
+enum class DemoScene
+{
+    Triangle,
+    Quad,
+    AnimatedTriangle
+};
+
 class VulkanRenderer
 {
 public:
@@ -43,7 +50,8 @@ public:
         const char* window_title,
         int width,
         int height,
-        const RendererShaderBinaries& shaders);
+        const RendererShaderBinaries& shaders,
+        DemoScene scene);
 
     void run();
     void shutdown();
@@ -88,6 +96,8 @@ private:
     VkShaderModule create_shader_module(slang::IBlob* shader_blob);
     uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties);
 
+    DemoScene scene_ = DemoScene::Triangle;
+    uint32_t vertex_count_ = 0;
 private:
     // Window
     GLFWwindow* window_ = nullptr;
